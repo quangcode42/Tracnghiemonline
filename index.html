@@ -154,21 +154,23 @@ header{position:sticky;top:0;z-index:100;background:rgba(13,17,23,.92);backdrop-
 .ds-item.correct .ds-label{background:var(--green);border-color:var(--green);color:#fff;}
 .ds-item.wrong .ds-label{background:var(--red);border-color:var(--red);color:#fff;}
 .ds-content{font-size:13.5px;line-height:1.55;flex:1;}
-.ds-btns{display:flex;gap:6px;margin-top:10px;margin-left:32px;}
-.ds-btn{font-family:inherit;font-size:13px;font-weight:700;padding:7px 20px;border-radius:8px;border:1.5px solid var(--border);background:var(--hover);color:var(--muted);cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:5px;min-width:90px;justify-content:center;}
-.ds-btn:hover:not(:disabled):not(.selected-dung):not(.selected-sai){border-color:var(--accent);color:var(--text);transform:translateY(-1px);}
+.ds-btns{display:flex;gap:8px;margin-top:10px;margin-left:32px;}
+.ds-btn{font-family:inherit;font-size:13px;font-weight:700;padding:7px 22px;border-radius:8px;border:1.5px solid var(--border);background:var(--hover);color:var(--muted);cursor:pointer;transition:all .18s;min-width:90px;text-align:center;}
+.ds-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent);background:rgba(88,166,255,.08);}
 .ds-btn:disabled{cursor:default;}
-.ds-btn.selected-dung{border-color:var(--green);background:rgba(63,185,80,.18);color:var(--green);box-shadow:0 0 0 3px rgba(63,185,80,.12);}
-.ds-btn.selected-sai{border-color:var(--red);background:rgba(248,81,73,.18);color:var(--red);box-shadow:0 0 0 3px rgba(248,81,73,.12);}
-.ds-btn.correct-final{border-color:var(--green);background:rgba(63,185,80,.2);color:var(--green);font-weight:800;}
-.ds-btn.wrong-final{border-color:var(--red);background:rgba(248,81,73,.15);color:var(--red);opacity:.6;}
-.ds-result{font-size:11px;font-weight:700;margin-left:8px;margin-top:1px;}
+/* Đang chọn (chưa nộp) → xanh dương */
+.ds-btn.selected{border-color:var(--accent);background:rgba(88,166,255,.15);color:var(--accent);}
+/* Sau khi nộp → xanh lá = đúng, đỏ = sai */
+.ds-btn.result-correct{border-color:var(--green);background:rgba(63,185,80,.15);color:var(--green);font-weight:800;}
+.ds-btn.result-wrong{border-color:var(--red);background:rgba(248,81,73,.12);color:var(--red);font-weight:800;}
+/* Nút không được chọn sau khi nộp → mờ */
+.ds-btn.unselected{opacity:.35;}
+.ds-item{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .25s,background .25s;}
+.ds-item.result-correct{border-color:rgba(63,185,80,.45);background:rgba(63,185,80,.05);}
+.ds-item.result-wrong{border-color:rgba(248,81,73,.35);background:rgba(248,81,73,.04);}
+.ds-result{font-size:11px;font-weight:700;margin-left:6px;}
 .ds-result.ok{color:var(--green);}
 .ds-result.err{color:var(--red);}
-.ds-item{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .25s,background .25s;}
-.ds-item.answered-correct{border-color:rgba(63,185,80,.5);background:rgba(63,185,80,.05);}
-.ds-item.answered-wrong{border-color:rgba(248,81,73,.4);background:rgba(248,81,73,.04);}
-.ds-item.pending{border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.04);}
 
 /* Trả lời ngắn */
 .tln-wrap{margin-bottom:10px;}
@@ -647,41 +649,40 @@ function renderMCQ(q, wrap) {
 }
 
 function renderDS(q, wrap) {
-  const a = answered[current]; // null = chưa nộp, object = đã nộp
+  const a = answered[current];
   let html = '<div class="ds-items">';
   q.subs.forEach((s, i) => {
     const userAns   = a ? (a.subs||{})[s.sub] : (dsUserAns[current]||{})[s.sub] || null;
     const submitted = !!a;
-    const isCorrect = submitted && userAns ? userAns === s.dap_an : null;
+    const isCorrect = submitted ? userAns === s.dap_an : null;
 
-    // Item border color
+    // Item border
     let itemCls = 'ds-item';
-    if (submitted) itemCls += isCorrect ? ' answered-correct' : ' answered-wrong';
-    else if (userAns) itemCls += ' pending';
+    if (submitted) itemCls += isCorrect ? ' result-correct' : ' result-wrong';
 
     // Label badge
     let labelCls = 'ds-label';
     if (submitted) labelCls += isCorrect ? ' correct' : ' wrong';
 
-    // Nút Đúng
-    let dCls = 'ds-btn';
-    if (userAns === 'Đ') {
-      dCls += submitted ? (isCorrect ? ' correct-final' : ' wrong-final') : ' selected-dung';
-    }
-    // Nút Sai
-    let sCls = 'ds-btn';
-    if (userAns === 'S') {
-      sCls += submitted ? (isCorrect ? ' correct-final' : ' wrong-final') : ' selected-sai';
-    }
-    // Nếu đã nộp và người dùng sai → highlight đáp án đúng
-    let dCorrectHint = '';
-    let sCorrectHint = '';
-    if (submitted && !isCorrect) {
-      if (s.dap_an === 'Đ') dCorrectHint = ' correct-final';
-      if (s.dap_an === 'S') sCorrectHint = ' correct-final';
+    const disabled = submitted ? 'disabled' : '';
+
+    // Tính class cho mỗi nút (Đúng / Sai)
+    function btnCls(btnVal) {
+      if (!submitted) {
+        // Chưa nộp: nút được chọn → xanh dương, còn lại bình thường
+        return 'ds-btn' + (userAns === btnVal ? ' selected' : '');
+      } else {
+        // Đã nộp
+        if (userAns === btnVal) {
+          // Nút người dùng đã chọn → xanh lá nếu đúng, đỏ nếu sai
+          return 'ds-btn' + (isCorrect ? ' result-correct' : ' result-wrong');
+        } else {
+          // Nút không chọn → mờ
+          return 'ds-btn unselected';
+        }
+      }
     }
 
-    const disabled = submitted ? 'disabled' : '';
     const resultIcon = submitted
       ? `<span class="ds-result ${isCorrect?'ok':'err'}">${isCorrect ? '✅' : '❌'}</span>` : '';
 
@@ -692,8 +693,8 @@ function renderDS(q, wrap) {
         ${resultIcon}
       </div>
       <div class="ds-btns">
-        <button class="${dCls}${dCorrectHint}" ${disabled} onclick="selectDS('${s.sub}','Đ','${current}')">✓ Đúng</button>
-        <button class="${sCls}${sCorrectHint}" ${disabled} onclick="selectDS('${s.sub}','S','${current}')">✗ Sai</button>
+        <button class="${btnCls('Đ')}" ${disabled} onclick="selectDS('${s.sub}','Đ','${current}')">✓ Đúng</button>
+        <button class="${btnCls('S')}" ${disabled} onclick="selectDS('${s.sub}','S','${current}')">✗ Sai</button>
       </div>
     </div>`;
   });
@@ -734,7 +735,7 @@ function selectMCQ(letter) {
   else nextQ();
 }
 
-// DS: track per-sub answers, update DOM directly (không re-render để giữ màu)
+// DS: track per-sub answers, cập nhật DOM trực tiếp để giữ màu
 const dsUserAns = {};
 function selectDS(subLabel, val, qIdx) {
   qIdx = parseInt(qIdx);
@@ -742,25 +743,22 @@ function selectDS(subLabel, val, qIdx) {
   dsUserAns[qIdx][subLabel] = val;
   const q = questions[qIdx];
 
-  // Cập nhật màu nút ngay lập tức bằng DOM — không re-render
+  // Cập nhật màu nút ngay → xanh dương cho nút được chọn
   const subIdx = q.subs.findIndex(s => s.sub === subLabel);
   const item = document.getElementById(`dsitem-${qIdx}-${subIdx}`);
   if (item) {
     const btns = item.querySelectorAll('.ds-btn');
-    btns[0].className = 'ds-btn' + (val === 'Đ' ? ' selected-dung' : ''); // Đúng
-    btns[1].className = 'ds-btn' + (val === 'S' ? ' selected-sai'  : ''); // Sai
-    item.classList.add('pending');
+    btns[0].className = 'ds-btn' + (val === 'Đ' ? ' selected' : ''); // nút Đúng
+    btns[1].className = 'ds-btn' + (val === 'S' ? ' selected' : ''); // nút Sai
   }
 
-  // Nếu đã chọn đủ tất cả ý → nộp và hiện kết quả
+  // Chọn đủ tất cả ý → nộp bài, re-render hiện kết quả
   if (Object.keys(dsUserAns[qIdx]).length >= q.subs.length) {
     const subs = dsUserAns[qIdx];
     let correctCount = 0;
     q.subs.forEach(s => { if (subs[s.sub] === s.dap_an) correctCount++; });
     answered[qIdx] = {correct: correctCount === q.subs.length, subs, correctCount, total: q.subs.length};
     delete dsUserAns[qIdx];
-
-    // Re-render để hiện kết quả đúng/sai từng ý
     renderQ();
     showToast(`${correctCount}/${q.subs.length} ý đúng`);
   }
